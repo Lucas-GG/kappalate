@@ -24,6 +24,16 @@
 
 kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL, which = NULL, subset = NULL, pstolerance = NULL) {
 
+  # geex returns an S4 object; use slots directly to avoid generic dispatch issues.
+  extract_estimates <- function(x) {
+    if (isS4(x) && methods::is(x, "geex")) return(x@estimates)
+    coef(x)
+  }
+  extract_vcov <- function(x) {
+    if (isS4(x) && methods::is(x, "geex")) return(x@vcov)
+    vcov(x)
+  }
+
   # Ensure required packages are loaded
   if (!requireNamespace("geex", quietly = TRUE)) {
     stop("Package 'geex' is required. Install it using install.packages('geex').")
@@ -233,7 +243,7 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
     bips <- coef(cbps_results)
     ips <- plogis(model.matrix(formula_z, data = data) %*% bips)
     }, error = function(e) {
-      message(sprintf("An error occurred using M-Estimation for the covariate balancing of treatment propensities: %s Did not acheive convergence. Instead logistic regression is used to estimate treatment propensity.", e$message))
+      message(sprintf("An error occurred using M-Estimation for the covariate balancing of treatment propensities: %s Did not acheive convergence. Instead logistic regression is used to estimate treatment propensity.", conditionMessage(e)))
       bips <<- coef(logit_model)
       ips <<- predict(logit_model, type = "response")
       })
@@ -408,11 +418,11 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
   tau_a_estimation <- m_estimate(
     estFUN = tau_a_condition,
     data   = data,
-    root_control = setup_root_control(start = c(bips,nums,kappas,late_a)))
+    root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips,nums,kappas,late_a)))
 
-  coef_tau_a <- coef(tau_a_estimation)
+  coef_tau_a <- extract_estimates(tau_a_estimation)
   tau_a <- coef_tau_a[length(coef_tau_a)]
-  vcov_tau_a <- vcov(tau_a_estimation)
+  vcov_tau_a <- extract_vcov(tau_a_estimation)
   var_tau_a <- vcov_tau_a[nrow(vcov_tau_a),ncol(vcov_tau_a)]
 
   # tau_a1
@@ -436,11 +446,11 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
   tau_a1_estimation <- m_estimate(
     estFUN = tau_a1_condition,
     data   = data,
-    root_control = setup_root_control(start = c(bips,nums,kappa_1s,late_a1)))
+    root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips,nums,kappa_1s,late_a1)))
 
-  coef_tau_a1 <- coef(tau_a1_estimation)
+  coef_tau_a1 <- extract_estimates(tau_a1_estimation)
   tau_a1 <- coef_tau_a1[length(coef_tau_a1)]
-  vcov_tau_a1 <- vcov(tau_a1_estimation)
+  vcov_tau_a1 <- extract_vcov(tau_a1_estimation)
   var_tau_a1 <- vcov_tau_a1[nrow(vcov_tau_a1),ncol(vcov_tau_a1)]
 
   # tau_a0
@@ -464,11 +474,11 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
   tau_a0_estimation <- m_estimate(
     estFUN = tau_a0_condition,
     data   = data,
-    root_control = setup_root_control(start = c(bips,nums,kappa_0s,late_a0)))
+    root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips,nums,kappa_0s,late_a0)))
 
-  coef_tau_a0 <- coef(tau_a0_estimation)
+  coef_tau_a0 <- extract_estimates(tau_a0_estimation)
   tau_a0 <- coef_tau_a0[length(coef_tau_a0)]
-  vcov_tau_a0 <- vcov(tau_a0_estimation)
+  vcov_tau_a0 <- extract_vcov(tau_a0_estimation)
   var_tau_a0 <- vcov_tau_a0[nrow(vcov_tau_a0),ncol(vcov_tau_a0)]
   }
 
@@ -496,11 +506,10 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
   tau_a10_estimation <- m_estimate(
     estFUN = tau_a10_condition,
     data   = data,
-    root_control = setup_root_control(start = c(bips, num1hats, kappa_1s, num0hats, kappa_0s, late_a10)))
-
-  coef_tau_a10 <- coef(tau_a10_estimation)
+    root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips, num1hats, kappa_1s, num0hats, kappa_0s, late_a10)))
+  coef_tau_a10 <- extract_estimates(tau_a10_estimation)
   tau_a10 <- coef_tau_a10[length(coef_tau_a10)]
-  vcov_tau_a10 <- vcov(tau_a10_estimation)
+  vcov_tau_a10 <- extract_vcov(tau_a10_estimation)
   var_tau_a10 <- vcov_tau_a10[nrow(vcov_tau_a10),ncol(vcov_tau_a10)]
   }
   }
@@ -529,7 +538,7 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
     tau_norm_estimation <- m_estimate(
       estFUN = tau_norm_condition,
       data   = data,
-      root_control = setup_root_control(start = c(bips, num1s, num0s, denom1s, denom0s, late_norm)))
+      root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips, num1s, num0s, denom1s, denom0s, late_norm)))
     }
 
   else if (bintreat == 1 && (dmeanz0 == 0 || dmeanz0 == 1 )){
@@ -554,7 +563,7 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
     tau_norm_estimation <- m_estimate(
       estFUN = tau_norm_condition,
       data   = data,
-      root_control = setup_root_control(start = c(bips, num1s, num0s, denom1s, late_norm)))
+      root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips, num1s, num0s, denom1s, late_norm)))
   }
 
   else if (bintreat == 1 && (dmeanz1 == 0 || dmeanz1 == 1 )){
@@ -579,18 +588,18 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
     tau_norm_estimation <- m_estimate(
       estFUN = tau_norm_condition,
       data   = data,
-      root_control = setup_root_control(start = c(bips, num1s, num0s, denom0s, late_norm)))
+      root_control = setup_root_control(FUN = rootSolve::multiroot, start = c(bips, num1s, num0s, denom0s, late_norm)))
   }
 
-  coef_tau_norm <- coef(tau_norm_estimation)
+  coef_tau_norm <- extract_estimates(tau_norm_estimation)
   tau_norm <- coef_tau_norm[length(coef_tau_norm)]
-  vcov_tau_norm <- vcov(tau_norm_estimation)
+  vcov_tau_norm <- extract_vcov(tau_norm_estimation)
   var_tau_norm <- vcov_tau_norm[nrow(vcov_tau_norm),ncol(vcov_tau_norm)]
   
   }, error = function(e) {
     stop(sprintf(
       "Error: Convergence of M-Estimation unsuccessful. Make sure that standarization of covariates is on as this makes convergence more likely in some cases. \nDetails: %s",
-      e$message
+      conditionMessage(e)
     ))
   })
    

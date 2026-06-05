@@ -1,0 +1,28 @@
+
+```{r}
+options(digits = 3)
+options(scipen = 10^5)
+options(help_type = "html")
+
+devtools::install("R")
+library(kappalate)
+
+```
+
+
+```{r}
+# Minimal sanity check for kappalate on fully synthetic data.
+# This isolates package behavior from the simulation DGP used below.
+set.seed(1)
+n_check <- 500
+check_data <- data.frame(
+  Y = 1 + 0.8 * rbinom(n_check, 1, 0.5) + 0.3 * rnorm(n_check) + rnorm(n_check),
+  X = rnorm(n_check),
+  A = rbinom(n_check, 1, plogis(0.5 * rnorm(n_check))),
+  Z = rbinom(n_check, 1, plogis(0.8 * rnorm(n_check)))
+)
+
+simple_kappalate <- kappalate(Y ~ X | A | Z, check_data, zmodel = "logit", std = "on")
+simple_kappalate
+simple_kappalate$coefficients
+```
