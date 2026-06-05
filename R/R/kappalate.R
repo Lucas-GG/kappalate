@@ -240,7 +240,7 @@ kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL
       data   = data,
       root_control = setup_root_control(FUN = rootSolve::multiroot, start = initial)
       )
-    bips <- coef(cbps_results)
+    bips <- extract_estimates(cbps_results)
     ips <- plogis(model.matrix(formula_z, data = data) %*% bips)
     }, error = function(e) {
       message(sprintf("An error occurred using M-Estimation for the covariate balancing of treatment propensities: %s Did not acheive convergence. Instead logistic regression is used to estimate treatment propensity.", conditionMessage(e)))

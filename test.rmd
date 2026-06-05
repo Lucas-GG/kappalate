@@ -26,3 +26,85 @@ simple_kappalate <- kappalate(Y ~ X | A | Z, check_data, zmodel = "logit", std =
 simple_kappalate
 simple_kappalate$coefficients
 ```
+
+
+```{r}
+create_data <- function(design, del, n) {
+  print(paste(design, del, n))
+  if (design == "A") {
+    gamma <- c(0, 0, 0) #4.75
+    f_mu1 <- \(x) dnorm(0, 0, 1)
+    f_zx  <- \(x) (2 * x - 1)  #linear  propensity
+  } else if (design == "B") {
+    gamma <- c(0, 2, - 1)
+    f_mu1 <- \(x) dnorm(0, 0, 1)
+    f_zx <- \(x) (2 * x - 1) #linear  propensity
+  } else if (design == "C") {
+    gamma <- c(0, 2, -1)
+    #nonlinear effect
+    f_mu1 <- \(x) dnorm(0, 0, 1) + ((3 * (x + 3))^2 - 111) / 18.2
+    f_zx <- \(x) (2 * x - 1)  #linear  propensity
+  } else if (design == "D") {
+    gamma <- c(0, 2, - 1)
+    f_mu1 <- \(x) dnorm(0, 0, 1) + ((3 * (x + 3))^2 - 111) / 18.2
+    f_zx <- \(x) (x + x^2 - 1)  #nonlinear propensity
+  }
+
+  g0      <- log((1 - del) / del)
+  f_pz    <- \(x) 1 / (1 + exp(- f_zx(x) * g0))
+  f_gw    <- \(x, z) gamma[1] + x * gamma[2] + z * gamma[3]
+
+
+
+  #DGP:
+  x    <- runif(n)
+  pz   <- f_pz(x)
+  z    <- (runif(n) < pz) |> as.integer()
+  E    <- MASS::mvrnorm(n, mu, SIGMA)
+
+  w1    <- pmin(pmax(0, floor(-1 + 7 * x + E[, 3])), 10)
+  r     <- f_gw(x, 1) > E[, 3]
+  w0    <- w1 + r
+  w     <- w0 + z * (w1 - w0)
+
+
+  #table(w, z)
+
+  Y <- matrix(0, nrow = n, ncol = 11)
+  Y[, 1]  <- E[, 1] > 0
+  for (i in 1:10) {
+    Y[, i + 1] <- E[, 1] + (- f_mu1(x) + E[, 2]) * i > 0
+  }
+  dim(Y)
+  # Select one potential outcome per row using row-wise matrix indexing.
+  y <- Y[cbind(seq_len(n), w + 1)]
+
+
+  late <- data.frame()
+  late[1, "true"] <- mean((Y[, w0 + 1] - Y[, w1 + 1])[w0 - w1 == 1])
+  print(late[1, "true"])
+  data <- data.frame(Y = y, X = x, W = w, Z = z)
+  gdata <- data
+  gdata$Y <- Y
+  gdata$w1 <- w1
+  gdata$w0 <- w0
+  list(data = data, late = late, gdata = gdata)
+}
+
+#choose design parameters (equal for A,B,C,D)
+rho   <- 0.5
+SIGMA <- matrix(c(1, 0, 0, 0, 1, rho, 0, rho, 1), 3, 3)
+mu    <- c(0, 0, 0)
+res <- create_data("A", 0.01, 2000)
+
+cbps_fitter <- \(data) {
+  cbps <- kappalate(Y ~ X | W | Z, data, std = "on")
+  est  <- cbps$coefficients |> as.vector()
+  se   <- cbps$vcov_matrix |> sqrt() |> as.vector()
+  ci   <- c(-1.96, 1.96) * se + est
+  c(est, se, ci)
+}
+
+cbps_fitter(res$data)
+
+```
