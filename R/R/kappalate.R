@@ -1,27 +1,36 @@
 # Hello, world!
 
+#' Estimate weighted Kappa estimators for the LATE
+#'
+#' Estimate the local average treatment effect (LATE) using methods based on
+#' inverse probability weighting and Abadie's kappa approach.
+#'
+#' @param given_formula A valid IV formula of the form
+#'   `outcome ~ exogenous variables | endogenous variable | instrumental variable`.
+#' @param data Data frame containing the variables used in `given_formula`.
+#' @param zmodel Instrument propensity score model. One of `"cbps"`, `"logit"`, or `"probit"`.
+#' @param vce Variance estimator type.
+#' @param std Whether to standardize non-binary covariates. One of `"on"` or `"off"`.
+#' @param which Which LATE estimates to return. One of `"norm"` or `"all"`.
+#' @param subset Optional subset of rows to use.
+#' @param pstolerance Tolerance used for the overlap check.
+#' @return A list of class `kappalate` containing coefficient estimates, a
+#'   variance-covariance matrix, the number of observations, and metadata.
+#' @importFrom Formula Formula
+#' @importFrom formula.tools lhs rhs
+#' @importFrom geex m_estimate setup_root_control
+#' @importFrom stats binomial coef dnorm formula glm lm model.matrix na.omit plogis pnorm predict reformulate vcov
+#' @export
+
 kappalate <- function(given_formula, data, zmodel = NULL, vce = NULL, std = NULL, which = NULL, subset = NULL, pstolerance = NULL) {
 
   # Ensure required packages are loaded
-  if (!requireNamespace("formula.tools", quietly = TRUE)) {
-    stop("Package 'formula.tools' is required. Install it using install.packages('formula.tools').")
-  }
   if (!requireNamespace("geex", quietly = TRUE)) {
     stop("Package 'geex' is required. Install it using install.packages('geex').")
   }
   if (!requireNamespace("Formula", quietly = TRUE)) {
     stop("Package 'Formula' is required. Install it using install.packages('Formula').")
   }
-  # Load libraries silently
-  invisible(
-    suppressMessages(
-      suppressWarnings(
-        try({
-          library(formula.tools)
-          library(geex)
-          library(Formula)
-        }, silent = TRUE)
-      )))
 
   # Check whether the formula is valid and raise an error if not.
   is.formula <- function(x){
